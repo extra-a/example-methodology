@@ -1,5 +1,5 @@
 import { GameState, Position, GunNames, Filter } from 'dmo-expositor/build/src/lib.js';
-import { getAngularDist, getDist, lookAngDiff, renderPNG } from './utils.js';
+import { getAngularDist, getAngularEstSz, getDist, renderPNG } from './utils.js';
 import { open } from 'node:fs/promises';
 import { ChartConfiguration } from 'chart.js';
 import path from 'node:path';
@@ -19,7 +19,6 @@ interface DataItem {
   adist: number,
   tavel: number,
   aavel: number,
-  alvel: number,
 }
 
 type UnpackFilter<T> = T extends Filter<(infer U)[]> ? U : never;
@@ -54,8 +53,9 @@ function makeFilter(gameState: GameState, {tcn, acn, gun, interval}: Options) {
         if (apos && tpos) {
           const adist = getAngularDist(tpos.value, apos.value);
           const dist = getDist(tpos.value, apos.value);
+          const { ax, ay } = getAngularEstSz(tpos.value, apos.value);
           if (Math.abs(adist) < 30) {
-            return { tcn, acn, ...ev, isHit, adist, dist };
+            return { tcn, acn, ...ev, isHit, adist, dist, ax, ay };
           }
         }
       }
@@ -67,6 +67,7 @@ function makeFilter(gameState: GameState, {tcn, acn, gun, interval}: Options) {
 }
 
 function processData(filter: ReturnType<typeof makeFilter>, gameState: GameState, {acn, tcn}: Options) {
+  const step = 10;
   return gameState.reduceFilteredTime(filter, new AlgState(), (state, ts, data) => {
     const tpos = gameState.getPos(tcn, ts)?.value;
     const apos = gameState.getPos(acn, ts)?.value;
@@ -83,20 +84,18 @@ function processData(filter: ReturnType<typeof makeFilter>, gameState: GameState
       const array = acc.get(sts)!;
       let tavel = 0;
       let aavel = 0;
-      let alvel = 0;
       if (state.lasttpos && state.lastapos) {
         const deltaA = getAngularDist(tpos, state.lastapos) - adist;
         const deltaT = getAngularDist(state.lasttpos, apos) - adist;
-        alvel = lookAngDiff(apos, state.lastapos) * 1000;
-        tavel = deltaT * 1000;
-        aavel = deltaA * 1000;
+        tavel = deltaT / step * 1000;
+        aavel = deltaA / step * 1000;
       }
-      array.push({ts: ts-sts, tpos, apos, adist, tavel, aavel, alvel});
+      array.push({ts: ts-sts, tpos, apos, adist, tavel, aavel});
     }
     state.lasttpos = tpos;
     state.lastapos = apos;
     return state;
-  })
+  }, step);
 }
 
 async function plot(acc: AlgState, {acn, tcn, gun, dir}: Options) {
@@ -109,9 +108,12 @@ async function plot(acc: AlgState, {acn, tcn, gun, dir}: Options) {
     const tavel = srs.map(item => item.tavel);
     const aavel = srs.map(item => item.aavel);
     const evs = acc.evs.get(sts)!;
-    const dist = evs.map(ev => ({ x: ev.timestamp - sts, y: ev.dist, isHit: ev.isHit }));
-    const hits = dist.filter(ev => ev.isHit);
-    const miss = dist.filter(ev => !ev.isHit);
+    const adist = evs.map(ev => ({ x: ev.timestamp - sts, y: ev.adist, isHit: ev.isHit }));
+    const aszx = evs.map(ev => ({ x: ev.timestamp - sts, y: ev.ax }));
+    const aszy = evs.map(ev => ({ x: ev.timestamp - sts, y: ev.ay }));
+
+    const hits = adist.filter(ev => ev.isHit);
+    const miss = adist.filter(ev => !ev.isHit);
     const config: ChartConfiguration = {
       type: 'line' as const,
       data: {
@@ -121,40 +123,60 @@ async function plot(acc: AlgState, {acn, tcn, gun, dir}: Options) {
             label: `Angular distance`,
             data,
             borderColor: 'rgb(244, 162, 89)',
-            spanGaps: false,
+            backgroundColor: 'rgb(244, 162, 89)',
+            cubicInterpolationMode: 'monotone',
+            tension: 1,
             yAxisID: 'angle-y-axis'
           },
           {
             label: `Target contributed angular vel`,
             data: tavel,
             borderColor: 'rgb(188, 75, 81)',
-            spanGaps: false,
+            backgroundColor: 'rgb(188, 75, 81)',
+            cubicInterpolationMode: 'monotone',
+            tension: 1,
             yAxisID: 'avel-y-axis'
           },
           {
             label: `Attacker contributed angular vel`,
             data: aavel,
             borderColor: 'rgb(91, 142, 125)',
-            spanGaps: false,
+            backgroundColor: 'rgb(91, 142, 125)',
+            cubicInterpolationMode: 'monotone',
+            tension: 1,
             yAxisID: 'avel-y-axis'
           },
           {
             label: `Hit`,
             data: hits,
             type: 'scatter',
-            pointBackgroundColor: 'rgb(0, 200, 0)',
+            pointBackgroundColor: 'rgb(0, 250, 0)',
             pointRadius: 10,
-            spanGaps: false,
-            yAxisID: 'dist-y-axis'
+            yAxisID: 'angle-y-axis'
           },
           {
             label: `Miss`,
             data: miss,
             type: 'scatter',
-            pointBackgroundColor: 'rgb(200, 0, 0)',
+            pointBackgroundColor: 'rgb(250, 0, 0)',
             pointRadius: 10,
-            spanGaps: false,
-            yAxisID: 'dist-y-axis'
+            yAxisID: 'angle-y-axis'
+          },
+          {
+            label: `Target angular sz X`,
+            data: aszx,
+            type: 'line',
+            backgroundColor: 'rgb(50, 150, 255)',
+            pointRadius: 5,
+            yAxisID: 'angle-y-axis'
+          },
+          {
+            label: `Target angular sz Y`,
+            data: aszy,
+            type: 'line',
+            backgroundColor: 'rgb(150, 50, 255)',
+            pointRadius: 5,
+            yAxisID: 'angle-y-axis'
           },
         ]
       },
@@ -175,6 +197,7 @@ async function plot(acc: AlgState, {acn, tcn, gun, dir}: Options) {
               text: 'deg',
               display: true,
             },
+            min: 0,
           },
           'avel-y-axis': {
             type: 'linear',
@@ -185,16 +208,6 @@ async function plot(acc: AlgState, {acn, tcn, gun, dir}: Options) {
               display: true,
             },
           },
-          'dist-y-axis': {
-            type: 'linear',
-            display: true,
-            position: 'left',
-            title: {
-              text: 'units',
-              display: true,
-            },
-            min: 0,
-          }
         },
       }
     };
