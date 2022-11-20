@@ -45,9 +45,9 @@ function showUsage() {
 Usage: npm start -- --acn=1 --tcn=2 input.json
 
 Other options:
-  --gun <FIST | SG | CG | RL | RIFLE | GL | PISTOL>    Weapon
-  --interval <number>    Interval before the shot
-  --dir <path>    Output dir
+  --gun=<FIST | SG | CG | RL | RIFLE | GL | PISTOL> RIFLE    Attacker weapon
+  --interval=<number> 1000    Interval before the shot
+  --dir=<path> .   Output directory
 `;
   console.log(usage);
   process.exit(0);

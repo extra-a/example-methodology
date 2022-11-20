@@ -1,5 +1,5 @@
-import { GameState, Position, GunNames } from 'dmo-expositor/build/src/lib.js';
-import { getAngularDist, lookAngDiff, renderPNG } from './utils.js';
+import { GameState, Position, GunNames, Filter } from 'dmo-expositor/build/src/lib.js';
+import { getAngularDist, getDist, lookAngDiff, renderPNG } from './utils.js';
 import { open } from 'node:fs/promises';
 import { ChartConfiguration } from 'chart.js';
 import path from 'node:path';
@@ -22,8 +22,12 @@ interface DataItem {
   alvel: number,
 }
 
+type UnpackFilter<T> = T extends Filter<(infer U)[]> ? U : never;
+type FilterEv = UnpackFilter<ReturnType<typeof makeFilter>>;
+
 class AlgState {
   items = new Map<number, DataItem[]>;
+  evs = new Map<number, FilterEv[]>;
   lasttpos?: Position;
   lastapos?: Position;
 }
@@ -41,10 +45,17 @@ function makeFilter(gameState: GameState, {tcn, acn, gun, interval}: Options) {
       if (ev.type === 'SHOT' && ev.gun === gun && acn !== tcn) {
         const apos = gameState.getPos(acn, ev.timestamp);
         const tpos = gameState.getPos(tcn, ev.timestamp);
+        const isHit = gameState.reduceGameEvents(acn, ev.timestamp-50, ev.timestamp+50, false, (acc, ev) => {
+          if (ev.type === 'HIT' && ev.tcn === tcn) {
+            return true;
+          }
+          return acc;
+        });
         if (apos && tpos) {
           const adist = getAngularDist(tpos.value, apos.value);
+          const dist = getDist(tpos.value, apos.value);
           if (Math.abs(adist) < 30) {
-            return { tcn, acn, ...ev, adist };
+            return { tcn, acn, ...ev, isHit, adist, dist };
           }
         }
       }
@@ -56,13 +67,14 @@ function makeFilter(gameState: GameState, {tcn, acn, gun, interval}: Options) {
 }
 
 function processData(filter: ReturnType<typeof makeFilter>, gameState: GameState, {acn, tcn}: Options) {
-  return gameState.reduceFilteredTime(filter, new AlgState(), (state, ts, [data]) => {
+  return gameState.reduceFilteredTime(filter, new AlgState(), (state, ts, data) => {
     const tpos = gameState.getPos(tcn, ts)?.value;
     const apos = gameState.getPos(acn, ts)?.value;
-    const sts = data.timestamp;
+    const sts = data[0].timestamp;
     const acc = state.items
     if (!acc.get(sts)) {
       acc.set(sts, []);
+      state.evs.set(sts, data);
       state.lasttpos = undefined;
       state.lastapos = undefined;
     }
@@ -96,7 +108,10 @@ async function plot(acc: AlgState, {acn, tcn, gun, dir}: Options) {
     const labels = srs.map(item => item.ts);
     const tavel = srs.map(item => item.tavel);
     const aavel = srs.map(item => item.aavel);
-    const alvel = srs.map(item => item.alvel);
+    const evs = acc.evs.get(sts)!;
+    const dist = evs.map(ev => ({ x: ev.timestamp - sts, y: ev.dist, isHit: ev.isHit }));
+    const hits = dist.filter(ev => ev.isHit);
+    const miss = dist.filter(ev => !ev.isHit);
     const config: ChartConfiguration = {
       type: 'line' as const,
       data: {
@@ -105,32 +120,42 @@ async function plot(acc: AlgState, {acn, tcn, gun, dir}: Options) {
           {
             label: `Angular distance`,
             data,
-            borderColor: 'rgb(244, 226, 133)',
+            borderColor: 'rgb(244, 162, 89)',
             spanGaps: false,
-            yAxisID: 'left-y-axis'
+            yAxisID: 'angle-y-axis'
           },
           {
             label: `Target contributed angular vel`,
             data: tavel,
             borderColor: 'rgb(188, 75, 81)',
             spanGaps: false,
-            yAxisID: 'right-y-axis'
+            yAxisID: 'avel-y-axis'
           },
           {
             label: `Attacker contributed angular vel`,
             data: aavel,
             borderColor: 'rgb(91, 142, 125)',
             spanGaps: false,
-            yAxisID: 'right-y-axis'
+            yAxisID: 'avel-y-axis'
           },
           {
-            label: `Attacker aim angular vel`,
-            data: alvel,
-            borderColor: 'rgb(140, 179, 105)',
+            label: `Hit`,
+            data: hits,
+            type: 'scatter',
+            pointBackgroundColor: 'rgb(0, 200, 0)',
+            pointRadius: 10,
             spanGaps: false,
-            yAxisID: 'right-y-axis'
+            yAxisID: 'dist-y-axis'
           },
-
+          {
+            label: `Miss`,
+            data: miss,
+            type: 'scatter',
+            pointBackgroundColor: 'rgb(200, 0, 0)',
+            pointRadius: 10,
+            spanGaps: false,
+            yAxisID: 'dist-y-axis'
+          },
         ]
       },
       options: {
@@ -142,7 +167,7 @@ async function plot(acc: AlgState, {acn, tcn, gun, dir}: Options) {
               display: true,
             },
           },
-          'left-y-axis': {
+          'angle-y-axis': {
             type: 'linear',
             display: true,
             position: 'left',
@@ -151,7 +176,7 @@ async function plot(acc: AlgState, {acn, tcn, gun, dir}: Options) {
               display: true,
             },
           },
-          'right-y-axis': {
+          'avel-y-axis': {
             type: 'linear',
             display: true,
             position: 'right',
@@ -160,6 +185,16 @@ async function plot(acc: AlgState, {acn, tcn, gun, dir}: Options) {
               display: true,
             },
           },
+          'dist-y-axis': {
+            type: 'linear',
+            display: true,
+            position: 'left',
+            title: {
+              text: 'units',
+              display: true,
+            },
+            min: 0,
+          }
         },
       }
     };
