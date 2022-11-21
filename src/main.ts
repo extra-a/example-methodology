@@ -1,10 +1,10 @@
 import ndjson from 'ndjson';
-import { GameReader } from 'dmo-expositor/build/src/lib.js';
 import { pipeline } from 'node:stream/promises';
 import parseArgs from 'minimist';
 import fs from 'node:fs';
-import { angDistPlotter, Options } from './angular-dist.js';
 import path from 'node:path';
+import { GameReader } from 'dmo-expositor/build/src/lib.js';
+import { angDistPlotter, Options } from './lib.js';
 
 async function main() {
   let cfg: Options = {
@@ -12,7 +12,7 @@ async function main() {
     tcn: 0,
     gun: 'RIFLE',
     interval: 1000,
-    dir: process.cwd()
+    dir: process.cwd(),
   };
   try {
     const argv = parseArgs(process.argv.slice(2));

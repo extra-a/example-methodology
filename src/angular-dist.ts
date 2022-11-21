@@ -12,7 +12,7 @@ export interface Options {
   dir: string,
 }
 
-interface DataItem {
+export interface DataItem {
   ts: number,
   tpos: Position,
   apos: Position,
@@ -24,7 +24,7 @@ interface DataItem {
 type UnpackFilter<T> = T extends Filter<(infer U)[]> ? U : never;
 type FilterEv = UnpackFilter<ReturnType<typeof makeFilter>>;
 
-class AlgState {
+export class AlgState {
   items = new Map<number, DataItem[]>;
   evs = new Map<number, FilterEv[]>;
   lasttpos?: Position;
@@ -37,7 +37,7 @@ export async function angDistPlotter(gameState: GameState, options: Options) {
   await plot(result, options);
 }
 
-function makeFilter(gameState: GameState, {tcn, acn, gun, interval}: Options) {
+export function makeFilter(gameState: GameState, {tcn, acn, gun, interval}: Options) {
   return gameState.makeEventFilter(
     acn,
     (ev) => {
@@ -66,13 +66,13 @@ function makeFilter(gameState: GameState, {tcn, acn, gun, interval}: Options) {
   );
 }
 
-function processData(filter: ReturnType<typeof makeFilter>, gameState: GameState, {acn, tcn}: Options) {
+export function processData(filter: ReturnType<typeof makeFilter>, gameState: GameState, {acn, tcn}: Options) {
   const step = 10;
   return gameState.reduceFilteredTime(filter, new AlgState(), (state, ts, data) => {
     const tpos = gameState.getPos(tcn, ts)?.value;
     const apos = gameState.getPos(acn, ts)?.value;
     const sts = data[0].timestamp;
-    const acc = state.items
+    const acc = state.items;
     if (!acc.get(sts)) {
       acc.set(sts, []);
       state.evs.set(sts, data);
@@ -108,10 +108,12 @@ async function plot(acc: AlgState, {acn, tcn, gun, dir}: Options) {
     const tavel = srs.map(item => item.tavel);
     const aavel = srs.map(item => item.aavel);
     const evs = acc.evs.get(sts)!;
-    const adist = evs.map(ev => ({ x: ev.timestamp - sts, y: ev.adist, isHit: ev.isHit }));
-    const aszx = evs.map(ev => ({ x: ev.timestamp - sts, y: ev.ax }));
-    const aszy = evs.map(ev => ({ x: ev.timestamp - sts, y: ev.ay }));
-
+    const sevs = evs.map(ev => {
+      return { ...ev, timestamp: ev.timestamp - sts};
+    });
+    const adist = sevs.map(ev => ({ x: ev.timestamp, y: ev.adist, isHit: ev.isHit }));
+    const aszx = sevs.map(ev => ({ x: ev.timestamp, y: ev.ax }));
+    const aszy = sevs.map(ev => ({ x: ev.timestamp, y: ev.ay }));
     const hits = adist.filter(ev => ev.isHit);
     const miss = adist.filter(ev => !ev.isHit);
     const config: ChartConfiguration = {
