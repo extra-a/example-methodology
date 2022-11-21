@@ -4,12 +4,15 @@ import { open } from 'node:fs/promises';
 import { ChartConfiguration } from 'chart.js';
 import path from 'node:path';
 
+export type ShiftOpts = 'attacker' | 'target' | 'none';
+
 export interface Options {
   tcn: number,
   acn: number,
   gun: GunNames,
   interval: number,
   dir: string,
+  shift: ShiftOpts,
 }
 
 export interface DataItem {
@@ -37,13 +40,14 @@ export async function angDistPlotter(gameState: GameState, options: Options) {
   await plot(result, options);
 }
 
-export function makeFilter(gameState: GameState, {tcn, acn, gun, interval}: Options) {
+export function makeFilter(gameState: GameState, {tcn, acn, gun, interval, shift}: Options) {
   return gameState.makeEventFilter(
     acn,
     (ev) => {
       if (ev.type === 'SHOT' && ev.gun === gun && acn !== tcn) {
-        const apos = gameState.getPos(acn, ev.timestamp);
-        const tpos = gameState.getPos(tcn, ev.timestamp);
+        const {tts, ats} = calcShiftedTime(gameState, ev.timestamp, acn, tcn, shift);
+        const apos = gameState.getPos(acn, ats);
+        const tpos = gameState.getPos(tcn, tts);
         const isHit = gameState.reduceGameEvents(acn, ev.timestamp-50, ev.timestamp+50, false, (acc, ev) => {
           if (ev.type === 'HIT' && ev.tcn === tcn) {
             return true;
@@ -66,11 +70,12 @@ export function makeFilter(gameState: GameState, {tcn, acn, gun, interval}: Opti
   );
 }
 
-export function processData(filter: ReturnType<typeof makeFilter>, gameState: GameState, {acn, tcn}: Options) {
+export function processData(filter: ReturnType<typeof makeFilter>, gameState: GameState, {acn, tcn, shift}: Options) {
   const step = 10;
   return gameState.reduceFilteredTime(filter, new AlgState(), (state, ts, data) => {
-    const tpos = gameState.getPos(tcn, ts)?.value;
-    const apos = gameState.getPos(acn, ts)?.value;
+    const {tts, ats} = calcShiftedTime(gameState, ts, acn, tcn, shift);
+    const tpos = gameState.getPos(tcn, tts)?.value;
+    const apos = gameState.getPos(acn, ats)?.value;
     const sts = data[0].timestamp;
     const acc = state.items;
     if (!acc.get(sts)) {
@@ -98,6 +103,25 @@ export function processData(filter: ReturnType<typeof makeFilter>, gameState: Ga
   }, step);
 }
 
+export function calcShiftedTime(gameState: GameState, ts: number, acn: number, tcn: number, shift: ShiftOpts) {
+  if (shift === 'target') {
+    const ping = gameState.getPing(tcn, ts);
+    if (ping) {
+      const dts = ping.value.ping;
+      const ats = ts-dts;
+      return {tts: ts, ats};
+    }
+  } else if (shift === 'attacker') {
+    const ping = gameState.getPing(acn, ts);
+    if (ping) {
+      const dts = ping.value.ping;
+      const tts = ts-dts;
+      return {tts, ats: ts};
+    }
+  }
+  return {tts: ts, ats: ts};
+}
+
 async function plot(acc: AlgState, {acn, tcn, gun, dir}: Options) {
   if (!acc.items.size) {
     return;
@@ -109,7 +133,7 @@ async function plot(acc: AlgState, {acn, tcn, gun, dir}: Options) {
     const aavel = srs.map(item => item.aavel);
     const evs = acc.evs.get(sts)!;
     const sevs = evs.map(ev => {
-      return { ...ev, timestamp: ev.timestamp - sts};
+      return { ...ev, timestamp: ev.timestamp - sts };
     });
     const adist = sevs.map(ev => ({ x: ev.timestamp, y: ev.adist, isHit: ev.isHit }));
     const aszx = sevs.map(ev => ({ x: ev.timestamp, y: ev.ax }));

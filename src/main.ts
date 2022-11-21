@@ -13,6 +13,7 @@ async function main() {
     gun: 'RIFLE',
     interval: 1000,
     dir: process.cwd(),
+    shift: 'attacker',
   };
   try {
     const argv = parseArgs(process.argv.slice(2));
@@ -48,6 +49,7 @@ Other options:
   --gun=<FIST | SG | CG | RL | RIFLE | GL | PISTOL> RIFLE    Attacker weapon
   --interval=<number> 1000    Interval before the shot
   --dir=<path> .   Output directory
+  --shift<attacker | target | none> attacker   Ping shift
 `;
   console.log(usage);
   process.exit(0);
