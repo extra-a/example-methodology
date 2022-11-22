@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node build/src/main.js",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json --declaration",
     "build:watch": "tsc -w -p tsconfig.json"
   },
   "type": "module",
@@ -23,7 +23,7 @@
   "dependencies": {
     "canvas": "^2.10.2",
     "chart.js": "^3.9.1",
-    "dmo-expositor": "../dmo-expositor",
+    "dmo-expositor": "file:../dmo-expositor",
     "mathjs": "^11.3.3",
     "minimist": "^1.2.7",
     "ndjson": "^2.0.0"
