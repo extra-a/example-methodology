@@ -70,9 +70,9 @@ const plugin = {
 
 Chart.defaults.font.size = 30;
 
-export async function renderPNG(configuration: ChartConfiguration) {
+export async function renderPNG(configuration: ChartConfiguration, width = 4000) {
   configuration = {...configuration};
-  const canvas = createCanvas(4000, 2000) as any;
+  const canvas = createCanvas(width, 2000) as any;
   // Disable animation (otherwise charts will throw exceptions)
   configuration.options = {...(configuration.options ?? {})};
   configuration.options.responsive = false;
