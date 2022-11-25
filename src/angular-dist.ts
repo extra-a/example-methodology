@@ -130,6 +130,7 @@ async function plot(acc: AlgState, {acn, tcn, gun, dir}: Options) {
     const labels = srs.map(item => item.ts);
     const tavel = srs.map(item => item.tavel);
     const aavel = srs.map(item => item.aavel);
+    const maxVel = aavel.reduce((max, value) => Math.max(max, Math.abs(value)), 0);
     const evs = acc.evs.get(sts)!;
     const sevs = evs.map(ev => {
       return { ...ev, timestamp: ev.timestamp - sts };
@@ -228,6 +229,8 @@ async function plot(acc: AlgState, {acn, tcn, gun, dir}: Options) {
             type: 'linear',
             display: true,
             position: 'right',
+            suggestedMax: maxVel,
+            suggestedMin: -maxVel,
             title: {
               text: 'deg/s',
               display: true,

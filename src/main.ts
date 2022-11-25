@@ -49,7 +49,7 @@ Other options:
   --gun=<FIST | SG | CG | RL | RIFLE | GL | PISTOL> RIFLE    Attacker weapon
   --interval=<number> 1000    Interval before the shot
   --dir=<path> .   Output directory
-  --shift<attacker | target | none> attacker   Ping shift
+  --shift=<attacker | target | none> attacker   Ping shift
 `;
   console.log(usage);
   process.exit(0);
