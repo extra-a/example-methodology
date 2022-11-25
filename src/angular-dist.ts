@@ -70,8 +70,7 @@ export function makeFilter(gameState: GameState, {tcn, acn, gun, interval, shift
   );
 }
 
-export function processData(filter: ReturnType<typeof makeFilter>, gameState: GameState, {acn, tcn, shift}: Options) {
-  const step = 10;
+export function processData(filter: ReturnType<typeof makeFilter>, gameState: GameState, {acn, tcn, shift}: Options, step = 10) {
   return gameState.reduceFilteredTime(filter, new AlgState(), (state, ts, data) => {
     const {tts, ats} = calcShiftedTime(gameState, ts, acn, tcn, shift);
     const tpos = gameState.getPos(tcn, tts)?.value;
