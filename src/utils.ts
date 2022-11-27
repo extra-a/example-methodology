@@ -34,7 +34,7 @@ export function getDist(target: Position, origin: Position) {
 export function lookAngDiff(pos: Position, prevpos: Position) {
   const viewRay = (yawPitchTovec(pos.yaw, pos.pitch));
   const prevViewRay = (yawPitchTovec(prevpos.yaw, prevpos.pitch));
-  return Math.acos(dot(prevViewRay, viewRay)) * 180 / Math.PI;
+  return Math.acos(Math.max(-1, Math.min(1, dot(prevViewRay, viewRay)))) * 180 / Math.PI;
 }
 
 export function yawPitchTovec(yaw: number, pitch: number) {

@@ -1,5 +1,5 @@
 import { GameState, Position, GunNames, Filter } from 'dmo-expositor/build/src/lib.js';
-import { getAngularDist, getAngularEstSz, getDist, renderPNG } from './utils.js';
+import { getAngularDist, getAngularEstSz, getDist, lookAngDiff, renderPNG } from './utils.js';
 import { open } from 'node:fs/promises';
 import { ChartConfiguration } from 'chart.js';
 import path from 'node:path';
@@ -10,7 +10,8 @@ export interface Options {
   tcn: number,
   acn: number,
   gun: GunNames,
-  interval: number,
+  before: number,
+  after: number,
   dir: string,
   shift: ShiftOpts,
 }
@@ -22,6 +23,7 @@ export interface DataItem {
   adist: number,
   tavel: number,
   aavel: number,
+  alvel: number,
 }
 
 type UnpackFilter<T> = T extends Filter<(infer U)[]> ? U : never;
@@ -40,7 +42,7 @@ export async function angDistPlotter(gameState: GameState, options: Options) {
   await plot(result, options);
 }
 
-export function makeFilter(gameState: GameState, {tcn, acn, gun, interval, shift}: Options) {
+export function makeFilter(gameState: GameState, {tcn, acn, gun, before, after, shift}: Options) {
   return gameState.makeEventFilter(
     acn,
     (ev) => {
@@ -65,7 +67,7 @@ export function makeFilter(gameState: GameState, {tcn, acn, gun, interval, shift
       }
       return;
     },
-    () => ({ before: interval, after: 0, mergeOverlap: true }),
+    () => ({ before, after, mergeOverlap: true }),
     'game'
   );
 }
@@ -88,13 +90,15 @@ export function processData(filter: ReturnType<typeof makeFilter>, gameState: Ga
       const array = acc.get(sts)!;
       let tavel = 0;
       let aavel = 0;
+      let alvel = 0;
       if (state.lasttpos && state.lastapos) {
+        alvel = lookAngDiff(apos, state.lastapos) / step * 1000;
         const deltaA = getAngularDist(tpos, state.lastapos) - adist;
         const deltaT = getAngularDist(state.lasttpos, apos) - adist;
         tavel = deltaT / step * 1000;
         aavel = deltaA / step * 1000;
       }
-      array.push({ts: ts-sts, tpos, apos, adist, tavel, aavel});
+      array.push({ts: ts-sts, tpos, apos, adist, tavel, aavel, alvel});
     }
     state.lasttpos = tpos;
     state.lastapos = apos;
@@ -130,7 +134,7 @@ async function plot(acc: AlgState, {acn, tcn, gun, dir}: Options) {
     const labels = srs.map(item => item.ts);
     const tavel = srs.map(item => item.tavel);
     const aavel = srs.map(item => item.aavel);
-    const maxVel = aavel.reduce((max, value) => Math.max(max, Math.abs(value)), 0);
+    const alvel = srs.map(item => item.alvel);
     const evs = acc.evs.get(sts)!;
     const sevs = evs.map(ev => {
       return { ...ev, timestamp: ev.timestamp - sts };
@@ -168,6 +172,15 @@ async function plot(acc: AlgState, {acn, tcn, gun, dir}: Options) {
             data: aavel,
             borderColor: 'rgb(91, 142, 125)',
             backgroundColor: 'rgb(91, 142, 125)',
+            cubicInterpolationMode: 'monotone',
+            tension: 1,
+            yAxisID: 'avel-y-axis'
+          },
+          {
+            label: `Attacker look angular vel`,
+            data: alvel,
+            borderColor: 'rgb(192, 203, 119)',
+            backgroundColor: 'rgb(192, 203, 119)',
             cubicInterpolationMode: 'monotone',
             tension: 1,
             yAxisID: 'avel-y-axis'
@@ -229,8 +242,8 @@ async function plot(acc: AlgState, {acn, tcn, gun, dir}: Options) {
             type: 'linear',
             display: true,
             position: 'right',
-            suggestedMax: maxVel,
-            suggestedMin: -maxVel,
+            suggestedMax: 360,
+            suggestedMin: -360,
             title: {
               text: 'deg/s',
               display: true,

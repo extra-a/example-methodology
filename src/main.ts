@@ -11,10 +11,12 @@ async function main() {
     acn: 0,
     tcn: 0,
     gun: 'RIFLE',
-    interval: 1000,
+    before: 1000,
+    after: 0,
     dir: process.cwd(),
     shift: 'attacker',
   };
+  console.time('total');
   try {
     const argv = parseArgs(process.argv.slice(2));
     const filePath = argv._[0];
@@ -36,6 +38,7 @@ async function main() {
     console.error(e);
     process.exit(-1);
   }
+  console.timeEnd('total');
   process.exit(0);
 }
 
@@ -47,7 +50,8 @@ Usage: npm start -- --acn=1 --tcn=2 input.json
 
 Other options:
   --gun=<FIST | SG | CG | RL | RIFLE | GL | PISTOL> RIFLE    Attacker weapon
-  --interval=<number> 1000    Interval before the shot
+  --before=<number> 1000    Interval before the shot
+  --after=<number> 0    Interval after the shot
   --dir=<path> .   Output directory
   --shift=<attacker | target | none> attacker   Ping shift
 `;
