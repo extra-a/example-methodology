@@ -13,7 +13,7 @@ export function getAngularDist(target: Position, origin: Position) {
   const distViewRay = cross(viewRay, distBetween);
   const lenO = vecLength(distViewRay as Vec3);
   const lenH = vecLength(distBetween as Vec3);
-  return Math.asin(lenO / lenH) * 180 / Math.PI;
+  return (dot(viewRay, distBetween) < 0 ? 90 : 0) + Math.asin(lenO / lenH) * 180 / Math.PI;
 }
 
 export function getAngularEstSz(target: Position, origin: Position) {

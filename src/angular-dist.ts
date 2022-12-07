@@ -60,7 +60,7 @@ export function makeFilter(gameState: GameState, {tcn, acn, gun, before, after, 
           const adist = getAngularDist(tpos.value, apos.value);
           const dist = getDist(tpos.value, apos.value);
           const { ax, ay } = getAngularEstSz(tpos.value, apos.value);
-          if (Math.abs(adist) < 30) {
+          if (adist < 30) {
             return { tcn, acn, ...ev, isHit, adist, dist, ax, ay };
           }
         }
