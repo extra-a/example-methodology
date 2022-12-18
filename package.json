@@ -21,6 +21,7 @@
   "dependencies": {
     "canvas": "^2.10.2",
     "chart.js": "^3.9.1",
+    "chartjs-node-canvas": "^4.1.6",
     "dmo-expositor": "file:../dmo-expositor",
     "mathjs": "^11.3.3",
     "minimist": "^1.2.7",

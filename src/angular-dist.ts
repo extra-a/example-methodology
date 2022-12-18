@@ -1,5 +1,5 @@
-import { GameState, Position, GunNames, Filter } from 'dmo-expositor/build/src/lib.js';
-import { getAngularDist, getAngularEstSz, getDist, lookAngDiff, renderPNG } from './utils.js';
+import { GameState, Position, GunNames, Filter, getAngularDist, getAngularEstSz, getDist, lookAngDiff } from 'dmo-expositor/build/src/lib.js';
+import { renderPNG } from './utils.js';
 import { open } from 'node:fs/promises';
 import { ChartConfiguration } from 'chart.js';
 import path from 'node:path';
